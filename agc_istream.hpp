@@ -1,6 +1,31 @@
+// agc_istream: istream [agc](https://github.com/refresh-bio/agc) archives.
+//
+// MIT License
+//
+// Copyright (c) 2023 Tommi Mäklin <tommi 'at' maklin.fi>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
 #include "zstd.h"
 #include "agc_decompressor_lib.h"
 
+namespace agc {
 class AgcStreamer : public CAGCDecompressorLibrary {
 private:
     ZSTD_DCtx* zstd_ctx;
@@ -63,7 +88,7 @@ public:
 
 };
 
-class agc_istream : public std::istringstream {
+class istream : public std::istringstream {
 private:
     AgcStreamer stream;
 
@@ -82,18 +107,4 @@ public:
 	}
     }
 };
-
-void print_contigs(std::istream &in) {
-    std::string line;
-    while (in && std::getline(in, line)) {
-	std::cerr << line << std::endl;
-    }
-}
-
-int main() {
-    agc_istream in("ref.agc");
-    in.find("ref");
-    print_contigs(in);
-
-    return 1;
 }
