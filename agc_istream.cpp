@@ -36,30 +36,9 @@ public:
 	    throw std::runtime_error("There is no sample " + sample_name);
 	}
 
-	this->q_contig_tasks = std::make_unique<CBoundedQueue<CAGCDecompressorLibrary::contig_task_t>>(1, 1);
-
-	std::vector<CAGCDecompressorLibrary::contig_task_t> v_tasks;
-
-	v_tasks.reserve(this->sample_desc.size());
-	v_tasks.shrink_to_fit();
-
-	for (size_t i = 0; i < this->sample_desc.size(); ++i)
-	    v_tasks.emplace_back(i, "", this->sample_desc[i].first, this->sample_desc[i].second);
-
-	std::sort(v_tasks.begin(), v_tasks.end(), [](auto& x, auto& y) {return x.segments.size() > y.segments.size(); });
-
-	this->q_contig_tasks->Restart(1);
-
-	std::vector<uint8_t> ctg;
-	CAGCDecompressorLibrary::contig_task_t contig_desc;
-
-	for (auto& task : v_tasks)
-	    this->q_contig_tasks->Push(task, 0);
-	this->q_contig_tasks->MarkCompleted();
-
-	while (!this->q_contig_tasks->IsCompleted()) {
-	    if (!this->q_contig_tasks->Pop(contig_desc))
-		break;
+	for (size_t i = 0; i < this->sample_desc.size(); ++i) {
+	    contig_task_t contig_desc(i, "", this->sample_desc[i].first, this->sample_desc[i].second);
+	    std::vector<uint8_t> ctg;
 
 	    this->decompress_contig(contig_desc, zstd_ctx, ctg);
 	    this->convert_to_alpha(ctg);
@@ -81,8 +60,6 @@ public:
 		this->sample_data += '\n';
 	    }
 	}
-
-	this->q_contig_tasks.release();
 
 	return std::istringstream(this->sample_data);
     }
