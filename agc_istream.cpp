@@ -11,7 +11,6 @@
 class AgcStreamer : public CAGCDecompressorLibrary {
 private:
     size_t line_length = 80;
-    size_t no_threads = 1;
 
     std::string sample_data;
     sample_desc_t sample_desc;
@@ -27,10 +26,9 @@ public:
 	}
 
 	this->q_contig_tasks = std::make_unique<CBoundedQueue<CAGCDecompressorLibrary::contig_task_t>>(1, 1);
-	this->pq_contigs_to_save = std::make_unique<CPriorityQueue<CAGCDecompressorLibrary::sample_contig_data_t>>(no_threads * 1);
+	this->pq_contigs_to_save = std::make_unique<CPriorityQueue<CAGCDecompressorLibrary::sample_contig_data_t>>(1);
 
 	std::vector<CAGCDecompressorLibrary::contig_task_t> v_tasks;
-	std::vector<std::thread> v_threads;
 
 	v_tasks.reserve(this->sample_desc.size());
 	v_tasks.shrink_to_fit();
@@ -42,53 +40,44 @@ public:
 
 	this->q_contig_tasks->Restart(1);
 
-	size_t i = 0;
-	bool converted_to_alpha = true;
-	v_threads.emplace_back([this, i, converted_to_alpha] {
+	ZSTD_DCtx *zstd_ctx = ZSTD_createDCtx();
 
-	    ZSTD_DCtx *zstd_ctx = ZSTD_createDCtx();
-
-	    std::vector<uint8_t> ctg;
-	    CAGCDecompressorLibrary::contig_task_t contig_desc;
-
-	    while (!this->q_contig_tasks->IsCompleted())
-		{
-		    if (!this->q_contig_tasks->Pop(contig_desc))
-			break;
-
-		    this->decompress_contig(contig_desc, zstd_ctx, ctg);
-		    this->convert_to_alpha(ctg);
-
-		    // Add contig descriptor line
-		    this->sample_data += ">";
-		    this->sample_data += contig_desc.name_range.str();
-		    this->sample_data += '\n';
-
-		    size_t nt_count = 0;
-		    for (auto nt : ctg) {
-			this->sample_data += nt;
-			++nt_count;
-			if (nt_count%80 == 0) {
-			    this->sample_data += '\n';
-			}
-		    }
-		    if (nt_count%80 != 0) {
-			this->sample_data += '\n';
-		    }
-		}
-
-	    this->pq_contigs_to_save->MarkCompleted();
-
-	    ZSTD_freeDCtx(zstd_ctx);
-	});
+	std::vector<uint8_t> ctg;
+	CAGCDecompressorLibrary::contig_task_t contig_desc;
 
 	for (auto& task : v_tasks)
 	    this->q_contig_tasks->Push(task, 0);
 	this->q_contig_tasks->MarkCompleted();
 
-	this->join_threads(v_threads);
+	while (!this->q_contig_tasks->IsCompleted())
+	    {
+		if (!this->q_contig_tasks->Pop(contig_desc))
+		    break;
 
-	v_threads.clear();
+		this->decompress_contig(contig_desc, zstd_ctx, ctg);
+		this->convert_to_alpha(ctg);
+
+		// Add contig descriptor line
+		this->sample_data += ">";
+		this->sample_data += contig_desc.name_range.str();
+		this->sample_data += '\n';
+
+		size_t nt_count = 0;
+		for (auto nt : ctg) {
+		    this->sample_data += nt;
+		    ++nt_count;
+		    if (nt_count%80 == 0) {
+			this->sample_data += '\n';
+		    }
+		}
+		if (nt_count%80 != 0) {
+		    this->sample_data += '\n';
+		}
+	    }
+
+	this->pq_contigs_to_save->MarkCompleted();
+
+	ZSTD_freeDCtx(zstd_ctx);
 
 	this->q_contig_tasks.release();
 	this->pq_contigs_to_save.release();
