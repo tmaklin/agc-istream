@@ -3,10 +3,6 @@
 #include "zstd.h"
 
 #include "agc_decompressor_lib.h" // CAGCDecompressorLibrary and sample_contig_data_t and contig_task_t
-#include "collection_v3.h" // sample_desc_t
-#include "queue.h" // CBoundedQueue and CPriorityQueue
-#include "genome_io.h" // CGenomeIO
-#include "defs.h" // contig_t
 
 class AgcStreamer : public CAGCDecompressorLibrary {
 private:
@@ -59,25 +55,30 @@ public:
     }
 };
 
-int main() {
-    std::string sample_name = "ref";
+class agc_istream : public std::istringstream {
+private:
+    AgcStreamer stream;
 
-    AgcStreamer streamer("ref.agc");
-    std::istringstream in = streamer.get(sample_name);
-    size_t line_nr = 0;
+public:
+    agc_istream(std::string _archive_path) : stream(_archive_path) {};
+
+    void find(const std::string &sample_name) {
+	std::istringstream contigs = this->stream.get(sample_name);
+	this->swap(contigs);
+    }
+};
+
+void print_contigs(std::istream &in) {
     std::string line;
     while (std::getline(in, line)) {
-	std::cerr << line_nr << '\t' << line << std::endl;
-	++line_nr;
+	std::cerr << line << std::endl;
     }
+}
 
-    sample_name = "ref2";
-    in = streamer.get(sample_name);
-    line_nr = 0;
-    while (std::getline(in, line)) {
-	std::cerr << line_nr << '\t' << line << std::endl;
-	++line_nr;
-    }
+int main() {
+    agc_istream in("ref.agc");
+    in.find("ref");
+    print_contigs(in);
 
     return 1;
 }
