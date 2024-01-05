@@ -13,15 +13,16 @@ private:
     size_t line_length = 80;
     size_t no_threads = 1;
 
+    std::string sample_data;
+    sample_desc_t sample_desc;
+
 public:
     AgcStreamer(std::string _archive_path) : CAGCDecompressorLibrary(true) {
 	this->Open(_archive_path);
     }
 
     std::istringstream get(const std::string &sample_name) {
-	sample_desc_t sample_desc;
-
-	if (!this->collection_desc->get_sample_desc(sample_name, sample_desc)) {
+	if (!this->collection_desc->get_sample_desc(sample_name, this->sample_desc)) {
 	    throw std::runtime_error("There is no sample " + sample_name);
 	}
 
@@ -31,13 +32,11 @@ public:
 	std::vector<CAGCDecompressorLibrary::contig_task_t> v_tasks;
 	std::vector<std::thread> v_threads;
 
-	std::ostringstream out;
-
-	v_tasks.reserve(sample_desc.size());
+	v_tasks.reserve(this->sample_desc.size());
 	v_tasks.shrink_to_fit();
 
-	for (size_t i = 0; i < sample_desc.size(); ++i)
-	    v_tasks.emplace_back(i, "", sample_desc[i].first, sample_desc[i].second);
+	for (size_t i = 0; i < this->sample_desc.size(); ++i)
+	    v_tasks.emplace_back(i, "", this->sample_desc[i].first, this->sample_desc[i].second);
 
 	std::sort(v_tasks.begin(), v_tasks.end(), [](auto& x, auto& y) {return x.segments.size() > y.segments.size(); });
 
@@ -45,7 +44,7 @@ public:
 
 	size_t i = 0;
 	bool converted_to_alpha = true;
-	v_threads.emplace_back([this, i, converted_to_alpha, &out] {
+	v_threads.emplace_back([this, i, converted_to_alpha] {
 
 	    ZSTD_DCtx *zstd_ctx = ZSTD_createDCtx();
 
@@ -60,16 +59,22 @@ public:
 		    this->decompress_contig(contig_desc, zstd_ctx, ctg);
 		    this->convert_to_alpha(ctg);
 
-		    out << ">" << contig_desc.name_range.str() << '\n';
+		    // Add contig descriptor line
+		    this->sample_data += ">";
+		    this->sample_data += contig_desc.name_range.str();
+		    this->sample_data += '\n';
+
 		    size_t nt_count = 0;
 		    for (auto nt : ctg) {
-			out << nt;
+			this->sample_data += nt;
 			++nt_count;
 			if (nt_count%80 == 0) {
-			    out << '\n';
+			    this->sample_data += '\n';
 			}
 		    }
-		    out << std::endl;
+		    if (nt_count%80 != 0) {
+			this->sample_data += '\n';
+		    }
 		}
 
 	    this->pq_contigs_to_save->MarkCompleted();
@@ -88,7 +93,7 @@ public:
 	this->q_contig_tasks.release();
 	this->pq_contigs_to_save.release();
 
-	return std::istringstream(out.str());
+	return std::istringstream(this->sample_data);
     }
 };
 
