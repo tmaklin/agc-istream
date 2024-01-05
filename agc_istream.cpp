@@ -1,5 +1,3 @@
-#define protected public // I don't want to make yet another derived class from CAGCDecompressorLibrary
-
 #include <exception>
 
 #include "zstd.h"
