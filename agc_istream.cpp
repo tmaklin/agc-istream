@@ -12,8 +12,9 @@ class AgcStreamer : public CAGCDecompressorLibrary {
 private:
     ZSTD_DCtx* zstd_ctx;
 
-    std::string sample_data;
     sample_desc_t sample_desc;
+    std::vector<std::vector<uint8_t>> contigs;
+    std::vector<std::string> contig_names;
 
     size_t line_length = 80;
 
@@ -28,40 +29,33 @@ public:
     }
 
     std::istringstream get(const std::string &sample_name) {
-	// Reset the sample data in case reusing the same object
-	this->sample_data = "";
-	ZSTD_DCtx_reset(this->zstd_ctx, ZSTD_reset_session_only);
-
 	if (!this->collection_desc->get_sample_desc(sample_name, this->sample_desc)) {
 	    throw std::runtime_error("There is no sample " + sample_name);
 	}
 
-	for (size_t i = 0; i < this->sample_desc.size(); ++i) {
-	    contig_task_t contig_desc(i, "", this->sample_desc[i].first, this->sample_desc[i].second);
-	    std::vector<uint8_t> ctg;
+	size_t n_contigs = this->sample_desc.size();
+	this->contigs.resize(n_contigs);
 
-	    this->decompress_contig(contig_desc, zstd_ctx, ctg);
-	    this->convert_to_alpha(ctg);
+	for (size_t i = 0; i < n_contigs; ++i) {
+	    contig_task_t contig_desc(i, "", this->sample_desc[i].first, this->sample_desc[i].second);
+
+	    this->decompress_contig(contig_desc, zstd_ctx, this->contigs[i]);
+	    this->convert_to_alpha(this->contigs[i]);
 
 	    // Add contig descriptor line
-	    this->sample_data += ">";
-	    this->sample_data += contig_desc.name_range.str();
-	    this->sample_data += '\n';
-
-	    size_t nt_count = 0;
-	    for (auto nt : ctg) {
-		this->sample_data += nt;
-		++nt_count;
-		if (nt_count%80 == 0) {
-		    this->sample_data += '\n';
-		}
-	    }
-	    if (nt_count%80 != 0) {
-		this->sample_data += '\n';
-	    }
+	    contig_names.emplace_back(">" + contig_desc.name_range.str());
 	}
 
-	return std::istringstream(this->sample_data);
+	ZSTD_DCtx_reset(this->zstd_ctx, ZSTD_reset_session_only);
+
+	std::vector<std::string> contig_strings(n_contigs);
+	for (size_t i = 0; i < n_contigs; ++i) {
+	    contig_strings[i] += this->contig_names[i];
+	    contig_strings[i] += '\n';
+	    contig_strings[i] += std::string(this->contigs[i].begin(), this->contigs[i].end());
+	    contig_strings[i] += '\n';
+	}
+	return std::istringstream(std::accumulate(contig_strings.begin(), contig_strings.end(), std::string("")));
     }
 };
 
