@@ -1,6 +1,5 @@
 #include "zstd.h"
-
-#include "agc_decompressor_lib.h" // CAGCDecompressorLibrary and sample_contig_data_t and contig_task_t
+#include "agc_decompressor_lib.h"
 
 class AgcStreamer : public CAGCDecompressorLibrary {
 private:
@@ -45,17 +44,24 @@ public:
 
 	ZSTD_DCtx_reset(this->zstd_ctx, ZSTD_reset_session_only);
 
-	std::vector<std::string> contig_strings(n_contigs);
-	for (size_t i = 0; i < n_contigs; ++i) {
 	return 1;
     }
+
+    size_t n_contigs() const { return this->contigs.size(); }
+    const std::vector<std::vector<uint8_t>>& get_contigs() const { return this->contigs; }
+    const std::vector<std::string>& get_contig_names() const { return this->contig_names; }
+
+    std::vector<std::string> get_contig_strings() {
+        std::vector<std::string> contig_strings(this->n_contigs());
+	for (size_t i = 0; i < this->n_contigs(); ++i) {
 	    contig_strings[i] += this->contig_names[i];
 	    contig_strings[i] += '\n';
 	    contig_strings[i] += std::string(this->contigs[i].begin(), this->contigs[i].end());
 	    contig_strings[i] += '\n';
 	}
-	return std::istringstream(std::accumulate(contig_strings.begin(), contig_strings.end(), std::string("")));
+	return contig_strings;
     }
+
 };
 
 class agc_istream : public std::istringstream {
@@ -66,8 +72,6 @@ public:
     agc_istream(std::string _archive_path) : stream(_archive_path) {};
 
     void find(const std::string &sample_name) {
-	std::istringstream contigs = this->stream.get(sample_name);
-	this->swap(contigs);
 	int ret = this->stream.extract(sample_name);
 	if (ret == 1) {
 	    const std::vector<std::string> &contig_strings = this->stream.get_contig_strings();
@@ -82,7 +86,7 @@ public:
 
 void print_contigs(std::istream &in) {
     std::string line;
-    while (std::getline(in, line)) {
+    while (in && std::getline(in, line)) {
 	std::cerr << line << std::endl;
     }
 }
