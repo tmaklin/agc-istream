@@ -74,6 +74,8 @@ public:
 	    const std::string &concat = std::accumulate(contig_strings.begin(), contig_strings.end(), std::string(""));
 	    std::istringstream contigs(concat);
 	    this->swap(contigs);
+	} else {
+	    this->setstate(std::ios_base::failbit);
 	}
     }
 };
