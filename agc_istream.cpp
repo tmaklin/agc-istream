@@ -25,7 +25,6 @@ public:
 
     int extract(const std::string &sample_name) {
 	if (!this->collection_desc->get_sample_desc(sample_name, this->sample_desc)) {
-	    std::cerr << "Sample " + sample_name + " was not found in archive " + this->archive_path + "!" << std::endl;;
 	    return 0;
 	}
 
