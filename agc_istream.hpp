@@ -93,7 +93,7 @@ private:
     AgcStreamer stream;
 
 public:
-    agc_istream(std::string _archive_path) : stream(_archive_path) {};
+    istream(std::string _archive_path) : stream(_archive_path) {};
 
     void find(const std::string &sample_name) {
 	int ret = this->stream.extract(sample_name);
