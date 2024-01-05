@@ -31,32 +31,10 @@ public:
 	std::vector<CAGCDecompressorLibrary::contig_task_t> v_tasks;
 	std::vector<std::thread> v_threads;
 
-	// Saving thread
-	std::thread gio_thread([&] {
-	    CGenomeIO gio;
-	    CAGCDecompressorLibrary::sample_contig_data_t ctg;
-
-	    gio.Open(sample_name, true);
-
-	    while (!this->pq_contigs_to_save->IsCompleted())
-		{
-		    if (!this->pq_contigs_to_save->Pop(ctg))
-			break;
-
-		    gio.SaveContig(ctg.contig_name, ctg.contig_data, line_length);
-		}
-
-	    gio.Close();
-	});
-
-	v_threads.clear();
-	v_threads.reserve(no_threads);
-
 	std::ostringstream out;
 
-	v_tasks.clear();
-	v_tasks.shrink_to_fit();
 	v_tasks.reserve(sample_desc.size());
+	v_tasks.shrink_to_fit();
 
 	for (size_t i = 0; i < sample_desc.size(); ++i)
 	    v_tasks.emplace_back(i, "", sample_desc[i].first, sample_desc[i].second);
@@ -106,8 +84,6 @@ public:
 	this->join_threads(v_threads);
 
 	v_threads.clear();
-
-	gio_thread.join();
 
 	this->q_contig_tasks.release();
 	this->pq_contigs_to_save.release();
